@@ -1,0 +1,1 @@
+gcc main.cpp ./src/calibration.cpp -Iinclude/ -lm -lstdc++ `pkg-config --cflags --libs opencv` -o main
