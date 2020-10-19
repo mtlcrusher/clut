@@ -2,11 +2,13 @@
 
 struct mouseparam mice;
 int calibration = 0;
+bool destroyed = false;
 bool callbackStatus = false;
 cv::Mat blankplot;
 cv::Mat updatePlotHS, updatePlotUV;
 cv::Mat HSVImg;
 cv::Mat YUVImg;
+
 float Margin = 0.f;
 int numLinearDiscriminatorPtsHS = 0;
 int numLinearDiscriminatorPtsUV = 0;
@@ -16,7 +18,7 @@ int segHS;
 
 plotparam paramHS = {0};
 plotparam paramUV = {0};
-float discr[4] = {0};
+float *discr;
 
 valueXY *valCalibHS;
 valueXY *valCalibUV;
@@ -27,7 +29,8 @@ void initCalibration(valueXY *calibHS, valueXY *calibUV, int segNumHS, int segNu
 {
   Margin = margin;
   blankplot = cv::Mat(400, 400, CV_8UC3, cv::Scalar(255,255,255));
-
+  discr = (float *)malloc(4*sizeof(float));
+  
   // set N points for linear discriminator
   numLinearDiscriminatorPtsHS = segNumHS * 4 * 2;
   numLinearDiscriminatorPtsUV = segNumUV * 4 * 2;
@@ -67,11 +70,11 @@ void initCalibration(valueXY *calibHS, valueXY *calibUV, int segNumHS, int segNu
   cv::namedWindow("plot_HSV", cv::WINDOW_AUTOSIZE);
 }
 
-cv::Point2f checkGradient(cv::Point2f Pt1, cv::Point2f Pt2)
+cv::Point2f checkGradient(const cv::Point2f& Pt1, const cv::Point2f& Pt2)
 {
-  valueXY result = {Pt1.x - Pt2.x, Pt2.y - Pt1.y};
-  float dist = 5.0f;
-  cv::Point2f midPt = Pt1 - (cv::Point2f(Pt1.x - Pt2.x, Pt1.y - Pt2.y))/2;
+  const valueXY result = {Pt1.x - Pt2.x, Pt2.y - Pt1.y};
+  const float dist = 5.0f;
+  const cv::Point2f midPt = Pt1 - (cv::Point2f(Pt1.x - Pt2.x, Pt1.y - Pt2.y))/2;
   if(result.y < 0 && result.x < 0)
     return midPt + cv::Point2f(dist,dist);
   else if(result.y > 0 && result.x > 0)
@@ -90,11 +93,6 @@ cv::Point2f checkGradient(cv::Point2f Pt1, cv::Point2f Pt2)
     return midPt + cv::Point2f(-dist,0);
 }
 
-cv::Point2f value2point(valueXY value, plotparam param)
-{
-  return cv::Point2f(param.b.x + (value.x * param.scale.x), param.b.y - (value.y * param.scale.y));
-}
-
 valueXY mouse2value(valueXY mousePos, plotparam param)
 {
   valueXY result;
@@ -105,15 +103,13 @@ valueXY mouse2value(valueXY mousePos, plotparam param)
 
 void plotLine(valueXY *valueCalib, cv::Mat& plot, plotparam param, int numPts)
 {
-  valueXY *tempPtr = valueCalib;
   cv::Point2f Pt1, Pt2;
-  while(tempPtr - valueCalib < numPts)
+  for(int i = 0; i < numPts; i+=2)
   {
-    Pt1 = value2point(tempPtr[0], param);
-    Pt2 = value2point(tempPtr[1], param);
+    Pt1 = cv::Point2f(param.b.x + (valueCalib[i+0].x * param.scale.x), param.b.y - (valueCalib[i+0].y * param.scale.y));
+    Pt2 = cv::Point2f(param.b.x + (valueCalib[i+1].x * param.scale.x), param.b.y - (valueCalib[i+1].y * param.scale.y));
     cv::line(plot, Pt1, Pt2, cv::Scalar(0,0,255));
     cv::circle(plot, checkGradient(Pt1, Pt2), 3, cv::Scalar(0,155,0), -1);
-    tempPtr+=2;
   }
 }
 
@@ -122,7 +118,7 @@ void plot(cv::Mat& img, cv::Mat& plot, plotparam param, int offset)
   cv::Mat tempImg;
   valueXY valueTempImg;
   cv::Point2f pt;
-  int imgSize = img.rows * img.cols * img.channels();
+  const int imgSize = img.rows * img.cols * img.channels();
   if(offset == offsetHS)
     cv::cvtColor(img, tempImg, cv::COLOR_BGR2HSV);
   else
@@ -131,7 +127,7 @@ void plot(cv::Mat& img, cv::Mat& plot, plotparam param, int offset)
   for(int j = 0;j < imgSize; j+=3)
   {
     valueTempImg = {(float)tempImg.data[j+0+offset], (float)tempImg.data[j+1+offset]};
-    pt = value2point(valueTempImg, param);
+    pt = cv::Point2f(param.b.x + (valueTempImg.x * param.scale.x), param.b.y - (valueTempImg.y * param.scale.y));
     cv::circle(plot, pt, 1, cv::Scalar(img.data[j+0], img.data[j+1], img.data[j+2]), -1);
   }
 }
@@ -159,7 +155,7 @@ void calibMouseCallback(int event, int x, int y, int flags, void *param)
   }
 }
 
-void drawingLine(cv::Mat& plot, valueXY *valCalib, plotparam param, char key)
+void drawingLine(cv::Mat& plot, valueXY *valCalib, plotparam param, const char& key)
 {
   if(key == 'e')
   {
@@ -184,8 +180,8 @@ void drawingLine(cv::Mat& plot, valueXY *valCalib, plotparam param, char key)
   
   if(mice.drawing)
   {
-    cv::Point Pt1(mice.start.x, mice.start.y);
-    cv::Point Pt2(mice.now.x, mice.now.y);
+    const cv::Point Pt1(mice.start.x, mice.start.y);
+    const cv::Point Pt2(mice.now.x, mice.now.y);
     cv::line(plot, Pt1, Pt2, cv::Scalar(0,0,255));
     cv::circle(plot, checkGradient(Pt1, Pt2), 3, cv::Scalar(0,155,0), -1);
     // cv::circle(plot, Pt1, 3, cv::Scalar(155,0,0), -1);
@@ -207,6 +203,7 @@ void Calibrate(cv::Mat& img, char key)
   {
     lineCalib = 0;
     callbackStatus = false;
+    destroyed = false;
     if(calibration == 0 || calibration == 2)
       calibration = 1;
     else
@@ -216,6 +213,7 @@ void Calibrate(cv::Mat& img, char key)
   {
     lineCalib = 0;
     callbackStatus = false;
+    destroyed = false;
     if(calibration == 0 || calibration == 1)
       calibration = 2;
     else
@@ -239,7 +237,11 @@ void Calibrate(cv::Mat& img, char key)
     drawingLine(updatePlotHS, valCalibHS, paramHS, key);
 
     cv::imshow("plot_HSV", updatePlotHS);
-    cv::destroyWindow("plot_YUV");
+    if(!destroyed)
+    {
+      cv::destroyWindow("plot_YUV");
+      destroyed = true;
+    }
   }
   else if(calibration == 2)
   {
@@ -258,65 +260,111 @@ void Calibrate(cv::Mat& img, char key)
     drawingLine(updatePlotUV, valCalibUV, paramUV, key);
 
     cv::imshow("plot_YUV", updatePlotUV);
-    cv::destroyWindow("plot_HSV");
+
+    if(!destroyed)
+    {
+      cv::destroyWindow("plot_HSV");
+      destroyed = true;
+    }
   }
   else
   {
-    cv::destroyWindow("plot_YUV");
-    cv::destroyWindow("plot_HSV");
+    if(!destroyed)
+    {
+      cv::destroyWindow("plot_YUV");
+      cv::destroyWindow("plot_HSV");
+      destroyed = true;
+    }
   }
   
 }
 
-uchar lineardiscriminator(valueXY img, valueXY *valCalib, int idxSeg)
+uchar lineardiscriminator(const valueXY& img, valueXY *valCalib, const int idxSeg)
 {
   for(int i = 0; i < 4; i++)
   {
-    valueXY valCalib1 = valCalib[2*i+4*idxSeg];
-    valueXY valCalib2 = valCalib[2*i+1+4*idxSeg];
-    valueXY valResult = {valCalib1.x - valCalib2.x, valCalib1.y - valCalib2.y};
+    const int idx1 = 2*i+4*idxSeg;
+    const int idx2 = 2*i+1+4*idxSeg;
+    const valueXY valResult = {valCalib[idx1].x - valCalib[idx2].x, valCalib[idx1].y - valCalib[idx2].y};
     if(valResult.y == 0 && valResult.x < 0)
-      discr[i] = img.y > valCalib1.y ? -1 : 1;
+      discr[i] = img.y > valCalib[idx1].y ? -1 : 1;
     else if(valResult.y == 0 && valResult.x >= 0)
-      discr[i] = img.y < valCalib1.y ? -1 : 1;
+      discr[i] = img.y < valCalib[idx1].y ? -1 : 1;
     else if(valResult.y < 0 && valResult.x == 0)
-      discr[i] = img.x > valCalib1.x ? -1 : 1;
+      discr[i] = img.x > valCalib[idx1].x ? -1 : 1;
     else if(valResult.y >= 0 && valResult.x == 0)
-      discr[i] = img.x < valCalib1.x ? -1 : 1;
+      discr[i] = img.x < valCalib[idx1].x ? -1 : 1;
     else
-      discr[i] = (img.x - valCalib1.x)/(valCalib2.x - valCalib1.x) 
-                - (img.y - valCalib1.y)/(valCalib2.y - valCalib1.y);
+      discr[i] = (img.x - valCalib[idx1].x)/(valCalib[idx2].x - valCalib[idx1].x) 
+                - (img.y - valCalib[idx1].y)/(valCalib[idx2].y - valCalib[idx1].y);
     if(discr[i] < 0)
       return 0;
   }
-  return 1;
+  return 255;
 }
 
-void segmentImg(cv::Mat imgInput, cv::Mat& imgOutput, colorSegment *color)
+void segmentImg(cv::Mat& imgInput, cv::Mat& imgOutput, colorSegment *color)
 {
-  int imgInputSize = imgInput.rows * imgInput.cols * imgInput.channels();
+  const int imgInputSize = imgInput.rows * imgInput.cols * imgInput.channels();
   imgOutput = cv::Mat(imgInput.rows, imgInput.cols, CV_8UC3, cv::Scalar(0,0,0));
   cv::cvtColor(imgInput, HSVImg, cv::COLOR_BGR2HSV);
   cv::cvtColor(imgInput, YUVImg, cv::COLOR_BGR2YUV);
 
   for(int i = 0; i < imgInputSize; i+=3)
   {
-    valueXY hs = {(float)HSVImg.data[i], (float)HSVImg.data[i+1]};
-    valueXY uv = {(float)YUVImg.data[i+1], (float)YUVImg.data[i+2]};
     for(int idx1 = 0; idx1 < segHS; idx1++)
     {
-      uchar res = lineardiscriminator(hs, valCalibHS, idx1);
-      imgOutput.data[i] = imgOutput.data[i] != 0 ? imgOutput.data[i] : color[idx1].val[0] * res;
-      imgOutput.data[i+1] = imgOutput.data[i+1] != 0 ? imgOutput.data[i+1] : color[idx1].val[1] * res;
-      imgOutput.data[i+2] = imgOutput.data[i+2] != 0 ? imgOutput.data[i+2] : color[idx1].val[2] * res;
+      const uchar res = lineardiscriminator({(float)HSVImg.data[i], (float)HSVImg.data[i+1]}, valCalibHS, idx1);
+      if(imgOutput.data[i] == 0)
+        imgOutput.data[i] = res != 0 ? color[idx1].val[0] : 0;
+      if(imgOutput.data[i+1] == 0)
+        imgOutput.data[i+1] = res != 0 ? color[idx1].val[1] : 0;
+      if(imgOutput.data[i+2] == 0)
+        imgOutput.data[i+2] = res != 0 ? color[idx1].val[2] : 0;
     }
     for(int idx2 = 0; idx2 < segUV; idx2++)
     {
-      int idx2color = idx2 + segHS;
-      uchar res = lineardiscriminator(uv, valCalibUV, idx2);
-      imgOutput.data[i] = imgOutput.data[i] != 0 ? imgOutput.data[i] : color[idx2color].val[0] * res;
-      imgOutput.data[i+1] = imgOutput.data[i+1] != 0 ? imgOutput.data[i+1] : color[idx2color].val[1] * res;
-      imgOutput.data[i+2] = imgOutput.data[i+2] != 0 ? imgOutput.data[i+2] : color[idx2color].val[2] * res;
+      const int idx2color = idx2 + segHS;
+      const uchar res = lineardiscriminator({(float)YUVImg.data[i+1], (float)YUVImg.data[i+2]}, valCalibUV, idx2);
+      if(imgOutput.data[i] == 0)
+        imgOutput.data[i] = res != 0 ? color[idx2color].val[0] : 0;
+      if(imgOutput.data[i+1] == 0)
+        imgOutput.data[i+1] = res != 0 ? color[idx2color].val[1] : 0;
+      if(imgOutput.data[i+2] == 0)
+        imgOutput.data[i+2] = res != 0 ? color[idx2color].val[2] : 0;
     }
+  }
+}
+
+void segmentImg(cv::Mat& imgInput, cv::Mat& imgOutput, const int discriminator)
+{
+  const int imgInputSize = imgInput.rows * imgInput.cols * imgInput.channels();
+  imgOutput = cv::Mat(imgInput.rows, imgInput.cols, CV_8UC3, cv::Scalar::all(0));
+  valueXY *tempPtr; 
+  uchar *imgData;
+  int offset1;
+  int idx;
+  if(discriminator < segHS)
+  {
+    cv::cvtColor(imgInput, HSVImg, cv::COLOR_BGR2HSV);
+    tempPtr = valCalibHS;
+    imgData = HSVImg.data;
+    offset1 = 0;
+    idx = discriminator;
+  }
+  else
+  {
+    cv::cvtColor(imgInput, YUVImg, cv::COLOR_BGR2YUV);
+    tempPtr = valCalibUV;
+    imgData = YUVImg.data;
+    offset1 = 1;
+    idx = discriminator - segHS;
+  }
+
+  for(int i = 0; i < imgInputSize; i+=3)
+  {
+    imgOutput.data[i] = lineardiscriminator({(float)imgData[i+offset1], (float)imgData[i+1+offset1]}, tempPtr, idx);
+    imgOutput.data[i+1] = imgOutput.data[i];
+    imgOutput.data[i+2] = imgOutput.data[i];
   }
 }

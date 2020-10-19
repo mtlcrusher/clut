@@ -55,10 +55,7 @@ int main(int argc, char **argv)
 
   Mat camFrame, FrameYUV, FrameHSV;
   Mat HSVImg, YUVImg;
-  Mat segmented;
-
-  cv::namedWindow("camFrame", WINDOW_AUTOSIZE);
-  // destroyWindow("camFrame");
+  Mat segmented, outputImg;
   
   initCalibration(valueCalibrationHS, valueCalibrationUV, 2, 2);
 
@@ -68,11 +65,17 @@ int main(int argc, char **argv)
 
     if(segmentedMode)
     {
-      segmentImg(camFrame, segmented, color);
-      imshow("segmented", segmented);
+      // segmentImg(camFrame, segmented, color);
+      segmentImg(camFrame, segmented, 2);
+      camFrame.copyTo(outputImg);
+      outputImg &= segmented;
+      imshow("segmented", outputImg);
+    }
+    else
+    {
+      imshow("camFrame", camFrame);
     }
 
-    imshow("camFrame", camFrame);
     // imshow("YUVImg", YUVImg);
     // imshow("HSVImg", HSVImg);
     keyB = waitKey(5);
@@ -83,11 +86,13 @@ int main(int argc, char **argv)
     {
       if(!segmentedMode)
       {
+        destroyWindow("camFrame");
         namedWindow("segmented", WINDOW_AUTOSIZE);
         segmentedMode = true;
       }
       else
       {
+        cv::namedWindow("camFrame", WINDOW_AUTOSIZE);
         destroyWindow("segmented");
         segmentedMode = false;
       }
