@@ -66,8 +66,8 @@ void initCalibration(valueXY *calibHS, valueXY *calibUV, int segNumHS, int segNu
   paramUV.scale.y = (paramUV.b.y - paramUV.a.y)/(paramUV.max.y - paramUV.min.y);
   paramUV.scale.x = (paramUV.c.x - paramUV.b.x)/(paramUV.max.x - paramUV.min.x);
   
-  cv::namedWindow("plot_YUV", cv::WINDOW_AUTOSIZE);
-  cv::namedWindow("plot_HSV", cv::WINDOW_AUTOSIZE);
+  cv::namedWindow("plot_YUV", cv::WINDOW_AUTOSIZE | cv::WINDOW_OPENGL);
+  cv::namedWindow("plot_HSV", cv::WINDOW_AUTOSIZE | cv::WINDOW_OPENGL);
 }
 
 cv::Point2f checkGradient(const cv::Point2f& Pt1, const cv::Point2f& Pt2)
@@ -224,7 +224,7 @@ void Calibrate(cv::Mat& img, char key)
   {
     if(!callbackStatus)
     {
-      cv::namedWindow("plot_HSV", cv::WINDOW_AUTOSIZE);
+      cv::namedWindow("plot_HSV", cv::WINDOW_AUTOSIZE | cv::WINDOW_OPENGL);
       cv::setMouseCallback("plot_HSV", calibMouseCallback);
       callbackStatus = true;
     }
@@ -247,7 +247,7 @@ void Calibrate(cv::Mat& img, char key)
   {
     if(!callbackStatus)
     {
-      cv::namedWindow("plot_YUV", cv::WINDOW_AUTOSIZE);
+      cv::namedWindow("plot_YUV", cv::WINDOW_AUTOSIZE | cv::WINDOW_OPENGL);
       cv::setMouseCallback("plot_YUV", calibMouseCallback);
       callbackStatus = true;
     }

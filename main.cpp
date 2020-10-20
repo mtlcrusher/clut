@@ -87,12 +87,12 @@ int main(int argc, char **argv)
       if(!segmentedMode)
       {
         destroyWindow("camFrame");
-        namedWindow("segmented", WINDOW_AUTOSIZE);
+        namedWindow("segmented", WINDOW_AUTOSIZE | WINDOW_OPENGL);
         segmentedMode = true;
       }
       else
       {
-        cv::namedWindow("camFrame", WINDOW_AUTOSIZE);
+        cv::namedWindow("camFrame", WINDOW_AUTOSIZE | WINDOW_OPENGL);
         destroyWindow("segmented");
         segmentedMode = false;
       }
